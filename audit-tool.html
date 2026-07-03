@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>File Audit Tool</title>
+<style>
+  :root {
+    --bg: #eef2f7;
+    --card: #ffffff;
+    --ink: #1e293b;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --accent: #6366f1;
+    --accent-dark: #4f46e5;
+    --green: #10b981;
+    --green-dark: #059669;
+    --violet: #8b5cf6;
+    --violet-dark: #7c3aed;
+    --amber: #f59e0b;
+    --amber-dark: #d97706;
+    --sel: #c7d2fe;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, Arial, sans-serif;
+    background: linear-gradient(180deg, #e8edf5 0%, #f4f6fa 240px);
+    color: var(--ink);
+    padding: 22px 26px;
+    min-height: 100vh;
+  }
+
+  /* ---------- Header ---------- */
+  .header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--violet));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; box-shadow: 0 6px 16px rgba(99,102,241,.35);
+  }
+  .header h1 { font-size: 20px; letter-spacing: -.3px; }
+  .header .subtitle { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar {
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    background: var(--card); padding: 14px; border-radius: var(--radius);
+    box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.12);
+    margin-bottom: 14px;
+  }
+  button {
+    border: none; padding: 9px 16px; border-radius: 8px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer; color: #fff;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: transform .08s ease, box-shadow .15s ease, background .15s ease;
+  }
+  button:hover:not(:disabled) { transform: translateY(-1px); }
+  button:active:not(:disabled) { transform: translateY(0); }
+  button:disabled { background: #cbd5e1 !important; cursor: not-allowed; box-shadow: none; }
+  #btnPick     { background: var(--accent); box-shadow: 0 4px 12px rgba(99,102,241,.3); }
+  #btnPick:hover:not(:disabled) { background: var(--accent-dark); }
+  #btnGenerate { background: var(--green); box-shadow: 0 4px 12px rgba(16,185,129,.3); }
+  #btnGenerate:hover:not(:disabled) { background: var(--green-dark); }
+  #btnExport   { background: var(--violet); box-shadow: 0 4px 12px rgba(139,92,246,.3); }
+  #btnExport:hover:not(:disabled) { background: var(--violet-dark); }
+  #btnFlatten  { background: var(--amber); box-shadow: 0 4px 12px rgba(245,158,11,.35); }
+  #btnFlatten:hover:not(:disabled) { background: var(--amber-dark); }
+  #addressBar {
+    flex: 1; min-width: 240px; padding: 9px 14px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font-size: 12.5px; background: #f8fafc; color: var(--muted);
+  }
+
+  /* ---------- Filter bar ---------- */
+  .filterbar {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .searchwrap { position: relative; flex: 1; min-width: 220px; }
+  .searchwrap .icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; color: var(--muted); pointer-events: none;
+  }
+  #filterInput {
+    width: 100%; padding: 9px 12px 9px 34px;
+    border: 1px solid var(--line); border-radius: 8px; font-size: 14px;
+    background: var(--card); outline: none;
+    transition: border .15s, box-shadow .15s;
+  }
+  #filterInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+  #btnClearFilter {
+    background: #fff; color: #ef4444; border: 1px solid #fecaca;
+  }
+  #btnClearFilter:hover:not(:disabled) { background: #fef2f2; }
+  #btnCopy { background: #0ea5e9; box-shadow: 0 4px 12px rgba(14,165,233,.3); }
+  #btnCopy:hover:not(:disabled) { background: #0284c7; }
+  #stats { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+  /* ---------- Layout: sidebar + table ---------- */
+  .main { display: flex; gap: 14px; align-items: stretch; }
+  .sidebar {
+    width: 280px; flex-shrink: 0;
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.12);
+    overflow: auto; max-height: 68vh;
+    display: flex; flex-direction: column;
+  }
+  .sidebar .sb-title {
+    padding: 12px 14px; font-size: 12px; font-weight: 700; letter-spacing: .6px;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; background: var(--card); z-index: 2;
+  }
+  .tree { padding: 8px; font-size: 13px; }
+  .tnode-row {
+    display: flex; align-items: center; gap: 4px;
+    padding: 5px 6px; border-radius: 7px; cursor: pointer; user-select: none;
+    color: #334155; transition: background .1s;
+  }
+  .tnode-row:hover { background: #f1f5f9; }
+  .tnode-row.active { background: #eef2ff; color: var(--accent-dark); font-weight: 600; }
+  .tnode-row .caret {
+    width: 16px; text-align: center; font-size: 10px; color: var(--muted);
+    flex-shrink: 0; cursor: pointer;
+  }
+  .tnode-row .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tnode-row .count {
+    font-size: 11px; color: var(--muted); background: #f1f5f9;
+    border-radius: 999px; padding: 1px 7px; flex-shrink: 0;
+  }
+  .tnode-row.active .count { background: #e0e7ff; color: var(--accent-dark); }
+  .tchildren { margin-left: 14px; border-left: 1px dashed var(--line); padding-left: 4px; }
+  .tchildren.collapsed { display: none; }
+  .tree-empty { padding: 20px 14px; color: var(--muted); font-size: 12.5px; text-align: center; }
+
+  /* ---------- Table ---------- */
+  .table-wrap {
+    flex: 1; background: var(--card); border-radius: var(--radius);
+    box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.12);
+    overflow: auto; max-height: 68vh; min-width: 0;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; z-index: 3;
+    background: #1e293b; color: #e2e8f0;
+    text-align: left; padding: 11px 14px; cursor: pointer;
+    user-select: none; white-space: nowrap; font-size: 12px;
+    letter-spacing: .4px; text-transform: uppercase;
+  }
+  thead th:hover { background: #0f172a; }
+  thead th .arrow { margin-left: 6px; font-size: 10px; color: #a5b4fc; }
+  tbody { user-select: none; }
+  tbody td {
+    padding: 8px 14px; border-bottom: 1px solid #f1f5f9; word-break: break-all;
+  }
+  tbody td.selectable { cursor: cell; }
+  tbody tr:nth-child(even) { background: #fafbfd; }
+  tbody tr:hover { background: #f0f4ff; }
+  tbody td.sel { background: var(--sel) !important; box-shadow: inset 0 0 0 1px #818cf8; }
+  .ext-badge {
+    display: inline-block; border-radius: 6px; padding: 2px 9px;
+    font-size: 11.5px; font-weight: 700; text-transform: lowercase;
+  }
+  .empty { padding: 46px; text-align: center; color: #94a3b8; font-size: 14px; }
+  .num { color: #94a3b8; text-align: right; width: 46px; font-size: 12px; }
+
+  /* ---------- Section: Register SharePoint ---------- */
+  .section-head { display: flex; align-items: center; gap: 14px; margin: 30px 0 14px; }
+  .section-head h2 { font-size: 17px; letter-spacing: -.2px; }
+  .logo.sp {
+    background: linear-gradient(135deg, #0ea5e9, #10b981);
+    box-shadow: 0 6px 16px rgba(14,165,233,.35);
+  }
+  .sp-input {
+    flex: 1; min-width: 280px; padding: 9px 14px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font-size: 12.5px; background: #fff; outline: none;
+    transition: border .15s, box-shadow .15s;
+  }
+  .sp-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
+  #btnSpFetch { background: #0ea5e9; box-shadow: 0 4px 12px rgba(14,165,233,.3); }
+  #btnSpFetch:hover:not(:disabled) { background: #0284c7; }
+  #btnSpLocal { background: #475569; box-shadow: 0 4px 12px rgba(71,85,105,.3); }
+  #btnSpLocal:hover:not(:disabled) { background: #334155; }
+  #btnSpClear { background: #fff; color: #ef4444; border: 1px solid #fecaca; }
+  #btnSpClear:hover:not(:disabled) { background: #fef2f2; }
+  #btnSpCopy { background: #0ea5e9; box-shadow: 0 4px 12px rgba(14,165,233,.3); }
+  #btnSpCopy:hover:not(:disabled) { background: #0284c7; }
+  .sp-select {
+    padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: 13px; background: #fff; color: var(--ink); cursor: pointer;
+  }
+  .sp-note { font-size: 12px; color: var(--muted); margin: -6px 0 12px 2px; }
+  .sp-label { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-left: 4px; }
+  .sp-filename {
+    flex: 1; min-width: 160px; padding: 9px 14px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font-size: 12.5px; background: #f8fafc; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sp-select:disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
+  #spStats { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 10px;
+    font-size: 13.5px; opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s;
+    box-shadow: 0 10px 30px rgba(15,23,42,.35); z-index: 99;
+    max-width: 80vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 900px) {
+    .main { flex-direction: column; }
+    .sidebar { width: 100%; max-height: 30vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">📁</div>
+  <div>
+    <h1>File Audit Tool</h1>
+    <div class="subtitle">Pilih folder → Generate → browse, sortir, filter, copy ke Excel, dan flatten file</div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <button id="btnPick">📂 Pilih Folder</button>
+  <input type="text" id="addressBar" placeholder="Folder terpilih akan tampil di sini..." readonly>
+  <button id="btnGenerate" disabled>⚡ Generate</button>
+  <button id="btnExport" disabled>⬇ Export CSV</button>
+  <button id="btnFlatten" disabled title="Pindahkan semua file dari subfolder ke folder utama, lalu hapus folder kosong">🗜 Flatten</button>
+  <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none">
+</div>
+
+<div class="filterbar">
+  <div class="searchwrap">
+    <span class="icon">🔍</span>
+    <input type="text" id="filterInput" placeholder="Ketik untuk memfilter nama file, folder, atau extension..." disabled>
+  </div>
+  <button id="btnClearFilter" disabled>✕ Clear Filter</button>
+  <button id="btnCopy" disabled>📋 Copy</button>
+  <span id="stats"></span>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sb-title">🗂 Browse Folder</div>
+    <div class="tree" id="treeContainer">
+      <div class="tree-empty">Struktur folder akan tampil di sini setelah Generate.</div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th class="num">No</th>
+          <th data-key="name">File Name <span class="arrow"></span></th>
+          <th data-key="path">Folder Path <span class="arrow"></span></th>
+          <th data-key="ext">Extension <span class="arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="4" class="empty">Belum ada data. Pilih folder lalu klik Generate.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================= SECTION: TARIK REGISTER EXCEL SHAREPOINT ================= -->
+<div class="section-head">
+  <div class="logo sp">📥</div>
+  <div>
+    <h2>Tarik Register dari File Excel</h2>
+    <div class="subtitle">Pilih file Excel register, tentukan sheet yang ditampilkan, lalu filter berdasarkan Company</div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <button id="btnSpLocal">📄 Pilih File Excel</button>
+  <span id="spFileName" class="sp-filename">Belum ada file dipilih</span>
+  <label class="sp-label" for="spSheetSel">Sheet:</label>
+  <select id="spSheetSel" class="sp-select" disabled><option>—</option></select>
+  <label class="sp-label" for="spCompanySel">Company:</label>
+  <select id="spCompanySel" class="sp-select" disabled><option value="">Semua Company</option></select>
+  <input type="file" id="spFileInput" accept=".xlsx,.xlsm,.xls,.csv" style="display:none">
+</div>
+<div class="sp-note">💡 Tips: pilih file dari folder OneDrive/SharePoint sync di komputermu — itu file yang sama dengan di SharePoint dan selalu ter-update otomatis.</div>
+
+<div class="filterbar">
+  <div class="searchwrap">
+    <span class="icon">🔍</span>
+    <input type="text" id="spFilter" placeholder="Filter isi register..." disabled>
+  </div>
+  <button id="btnSpClear" disabled>✕ Clear Filter</button>
+  <button id="btnSpCopy" disabled>📋 Copy</button>
+  <span id="spStats"></span>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead id="spHead"></thead>
+    <tbody id="spBody">
+      <tr><td class="empty" colspan="99">Belum ada data register. Pilih file Excel untuk menampilkan register.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  // ===== File bantuan/sistem yang disembunyikan dari daftar =====
+  const HIDDEN_NAMES = ['path-map.txt', 'thumbs.db', 'desktop.ini', '.ds_store'];
+  const HIDDEN_PREFIXES = ['~$'];
+  const HIDDEN_EXTS = ['tmp'];
+
+  const FSA_SUPPORTED = ('showDirectoryPicker' in window);
+
+  let dirHandle = null;    // handle folder root (File System Access API)
+  let fsaFiles = [];       // hasil scan FSA: {name, path, handle, parent, inRoot}
+  let pickedFiles = [];    // fallback: File[] dari input webkitdirectory
+  let allRows = [];        // baris yang tampil (setelah file bantuan dibuang)
+  let hiddenCount = 0;
+  let viewRows = [];
+  let sortKey = null;
+  let sortAsc = true;
+  let selectedFolder = null;
+  let collapsedSet = new Set();
+  let busy = false;        // sedang scan / flatten
+
+  // seleksi sel
+  let selAnchor = null, selFocus = null, dragging = false;
+  const COLS = ['name', 'path', 'ext'];
+
+  const folderInput = document.getElementById('folderInput');
+  const addressBar  = document.getElementById('addressBar');
+  const btnPick     = document.getElementById('btnPick');
+  const btnGenerate = document.getElementById('btnGenerate');
+  const btnExport   = document.getElementById('btnExport');
+  const btnFlatten  = document.getElementById('btnFlatten');
+  const btnClear    = document.getElementById('btnClearFilter');
+  const btnCopy     = document.getElementById('btnCopy');
+  const filterInput = document.getElementById('filterInput');
+  const tableBody   = document.getElementById('tableBody');
+  const treeContainer = document.getElementById('treeContainer');
+  const stats       = document.getElementById('stats');
+  const toast       = document.getElementById('toast');
+
+  // ================= PILIH FOLDER =================
+  btnPick.addEventListener('click', async () => {
+    if (FSA_SUPPORTED) {
+      try {
+        dirHandle = await window.showDirectoryPicker();
+      } catch (err) {
+        return; // user batal memilih
+      }
+      pickedFiles = [];
+      addressBar.value = '📁 ' + dirHandle.name;
+      btnGenerate.disabled = false;
+      stats.textContent = 'Folder siap. Klik Generate untuk memindai isi folder.';
+    } else {
+      folderInput.click();
+    }
+  });
+
+  // fallback untuk browser tanpa File System Access API (mis. Firefox)
+  folderInput.addEventListener('change', () => {
+    pickedFiles = Array.from(folderInput.files);
+    if (pickedFiles.length === 0) return;
+    dirHandle = null;
+    const rootName = pickedFiles[0].webkitRelativePath.split('/')[0];
+    addressBar.value = rootName + '  (' + pickedFiles.length + ' file terdeteksi)';
+    btnGenerate.disabled = false;
+    stats.textContent = 'Folder siap. Klik Generate untuk membuat daftar. (Flatten butuh Edge/Chrome)';
+  });
+
+  // ================= SCAN =================
+  async function scanFSA() {
+    fsaFiles = [];
+    async function walk(dir, path) {
+      for await (const entry of dir.values()) {
+        if (entry.kind === 'file') {
+          fsaFiles.push({
+            name: entry.name, path: path, handle: entry, parent: dir,
+            inRoot: dir === dirHandle
+          });
+        } else {
+          await walk(entry, path + '\\' + entry.name);
+        }
+      }
+    }
+    await walk(dirHandle, dirHandle.name);
+    return fsaFiles.map(f => ({ name: f.name, path: f.path }));
+  }
+
+  function scanInputFiles() {
+    return pickedFiles.map(f => {
+      const parts = f.webkitRelativePath.split('/');
+      return { name: parts[parts.length - 1], path: parts.slice(0, -1).join('\\') };
+    });
+  }
+
+  // ================= GENERATE =================
+  btnGenerate.addEventListener('click', async () => {
+    if (busy) return;
+    busy = true;
+    btnGenerate.disabled = true;
+    stats.textContent = '⏳ Memindai folder...';
+    try {
+      const entries = dirHandle ? await scanFSA() : scanInputFiles();
+      processEntries(entries);
+    } catch (err) {
+      stats.textContent = '';
+      showToast('⚠️ Gagal memindai folder: ' + err.message);
+    }
+    busy = false;
+    btnGenerate.disabled = false;
+  });
+
+  function processEntries(entries) {
+    hiddenCount = 0;
+    allRows = [];
+    entries.forEach(e => {
+      const dot = e.name.lastIndexOf('.');
+      const ext = (dot > 0 && dot < e.name.length - 1) ? e.name.slice(dot + 1).toLowerCase() : '(tanpa ext)';
+      const low = e.name.toLowerCase();
+      const isHidden = HIDDEN_NAMES.includes(low) ||
+                       HIDDEN_PREFIXES.some(p => low.startsWith(p)) ||
+                       HIDDEN_EXTS.includes(ext);
+      if (isHidden) { hiddenCount++; return; }
+      allRows.push({ name: e.name, path: e.path, ext });
+    });
+
+    filterInput.disabled = false;
+    btnExport.disabled = false;
+    btnClear.disabled = false;
+    btnFlatten.disabled = !dirHandle; // flatten hanya via File System Access API
+    filterInput.value = '';
+    sortKey = null;
+    selectedFolder = null;
+    collapsedSet = new Set();
+    clearSelection();
+    buildTree();
+    render();
+  }
+
+  // ================= FLATTEN =================
+  btnFlatten.addEventListener('click', async () => {
+    if (!dirHandle || busy) return;
+
+    // 1. minta izin tulis (prompt browser, sekali per sesi)
+    let perm = 'prompt';
+    try {
+      perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+    } catch (err) {
+      showToast('⚠️ Tidak bisa meminta izin tulis: ' + err.message);
+      return;
+    }
+    if (perm !== 'granted') {
+      showToast('⚠️ Izin tulis ditolak — flatten dibatalkan.');
+      return;
+    }
+
+    // 2. scan ulang supaya data terkini, lalu hitung yang akan dipindah
+    busy = true;
+    btnFlatten.disabled = true;
+    stats.textContent = '⏳ Memindai ulang sebelum flatten...';
+    try {
+      await scanFSA();
+    } catch (err) {
+      showToast('⚠️ Gagal memindai: ' + err.message);
+      busy = false; btnFlatten.disabled = false;
+      return;
+    }
+    const toMove = fsaFiles.filter(f => !f.inRoot);
+
+    if (toMove.length === 0) {
+      showToast('ℹ️ Tidak ada file di subfolder — semua sudah di folder utama.');
+      busy = false; btnFlatten.disabled = false;
+      render();
+      return;
+    }
+
+    // 3. konfirmasi — tindakan ini permanen
+    const okConfirm = confirm(
+      '⚠️ FLATTEN FOLDER: "' + dirHandle.name + '"\n\n' +
+      '• ' + toMove.length + ' file akan DIPINDAHKAN dari subfolder ke folder utama\n' +
+      '• Jika ada nama file yang sama, otomatis diberi akhiran (2), (3), dst.\n' +
+      '• Semua folder yang menjadi kosong akan DIHAPUS\n\n' +
+      'Tindakan ini TIDAK BISA di-undo. Lanjutkan?'
+    );
+    if (!okConfirm) {
+      busy = false; btnFlatten.disabled = false;
+      stats.textContent = 'Flatten dibatalkan.';
+      return;
+    }
+
+    // 4. kumpulkan nama yang sudah ada di root untuk deteksi bentrok nama
+    const takenNames = new Set();
+    fsaFiles.filter(f => f.inRoot).forEach(f => takenNames.add(f.name.toLowerCase()));
+
+    // 5. pindahkan file satu per satu
+    let moved = 0, renamed = 0;
+    const failures = [];
+    for (let i = 0; i < toMove.length; i++) {
+      const f = toMove[i];
+      stats.textContent = '⏳ Memindahkan file ' + (i + 1) + ' / ' + toMove.length + ' : ' + f.name;
+      const finalName = uniqueName(f.name, takenNames);
+      if (finalName !== f.name) renamed++;
+      try {
+        await moveFile(f, finalName);
+        takenNames.add(finalName.toLowerCase());
+        moved++;
+      } catch (err) {
+        failures.push(f.path + '\\' + f.name + '  →  ' + err.message);
+      }
+    }
+
+    // 6. hapus folder yang sudah kosong (dari yang terdalam dulu)
+    stats.textContent = '⏳ Menghapus folder kosong...';
+    let removedDirs = 0;
+    try {
+      removedDirs = await pruneEmptyDirs(dirHandle);
+    } catch (err) {
+      failures.push('Hapus folder kosong: ' + err.message);
+    }
+
+    // 7. scan ulang & refresh tampilan
+    stats.textContent = '⏳ Memuat ulang daftar file...';
+    try {
+      const entries = await scanFSA();
+      processEntries(entries);
+    } catch (err) { /* tampilan lama tetap dipakai */ }
+
+    busy = false;
+    btnFlatten.disabled = false;
+
+    let msg = '✅ Flatten selesai: ' + moved + ' file dipindahkan, ' + removedDirs + ' folder kosong dihapus';
+    if (renamed > 0) msg += ', ' + renamed + ' file di-rename karena nama sama';
+    if (failures.length > 0) {
+      msg += ' — ⚠️ ' + failures.length + ' gagal (lihat console F12)';
+      console.warn('Flatten gagal untuk file berikut:\n' + failures.join('\n'));
+    }
+    showToast(msg);
+  });
+
+  // pindahkan 1 file ke root: coba API move() dulu, kalau tidak didukung
+  // pakai cara aman: salin isi ke root → hapus file asal
+  async function moveFile(f, finalName) {
+    if (typeof f.handle.move === 'function') {
+      try {
+        await f.handle.move(dirHandle, finalName);
+        return;
+      } catch (err) { /* lanjut ke metode salin+hapus */ }
+    }
+    const srcFile = await f.handle.getFile();
+    const destHandle = await dirHandle.getFileHandle(finalName, { create: true });
+    const writable = await destHandle.createWritable();
+    await writable.write(srcFile);
+    await writable.close();
+    // hapus sumber HANYA setelah salinan sukses ditulis
+    await f.parent.removeEntry(f.name);
+  }
+
+  // beri nama unik: "laporan.pdf" → "laporan (2).pdf" bila sudah ada
+  function uniqueName(name, takenNames) {
+    if (!takenNames.has(name.toLowerCase())) return name;
+    const dot = name.lastIndexOf('.');
+    const base = dot > 0 ? name.slice(0, dot) : name;
+    const ext  = dot > 0 ? name.slice(dot) : '';
+    let n = 2;
+    let candidate = base + ' (' + n + ')' + ext;
+    while (takenNames.has(candidate.toLowerCase())) {
+      n++;
+      candidate = base + ' (' + n + ')' + ext;
+    }
+    return candidate;
+  }
+
+  // hapus subfolder kosong secara rekursif (post-order: anak dulu, baru induk)
+  async function pruneEmptyDirs(dir) {
+    let removed = 0;
+    const subdirs = [];
+    for await (const entry of dir.values()) {
+      if (entry.kind === 'directory') subdirs.push(entry);
+    }
+    for (const sub of subdirs) {
+      removed += await pruneEmptyDirs(sub);
+      let isEmpty = true;
+      for await (const _ of sub.values()) { isEmpty = false; break; }
+      if (isEmpty) {
+        await dir.removeEntry(sub.name);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  // ================= FILTER / SORT =================
+  filterInput.addEventListener('input', () => { clearSelection(); render(); });
+
+  btnClear.addEventListener('click', () => {
+    filterInput.value = '';
+    selectedFolder = null;
+    clearSelection();
+    buildTree();
+    render();
+  });
+
+  document.querySelectorAll('thead th[data-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (sortKey === key) { sortAsc = !sortAsc; }
+      else { sortKey = key; sortAsc = true; }
+      clearSelection();
+      render();
+    });
+  });
+
+  // ================= FOLDER TREE =================
+  function buildTree() {
+    const root = { children: {}, count: 0 };
+    allRows.forEach(r => {
+      const segs = r.path.split('\\');
+      let node = root;
+      let acc = '';
+      segs.forEach(s => {
+        acc = acc ? acc + '\\' + s : s;
+        if (!node.children[s]) node.children[s] = { children: {}, count: 0, full: acc };
+        node = node.children[s];
+        node.count++;
+      });
+    });
+
+    let html = '<div class="tnode-row' + (selectedFolder === null ? ' active' : '') +
+               '" data-path=""><span class="caret"></span><span class="fname">📄 Semua File</span>' +
+               '<span class="count">' + allRows.length + '</span></div>';
+    html += renderNodes(root.children);
+    treeContainer.innerHTML = html || '<div class="tree-empty">Tidak ada folder.</div>';
+
+    treeContainer.querySelectorAll('.tnode-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        const path = row.dataset.path;
+        if (e.target.classList.contains('caret') && e.target.textContent) {
+          if (collapsedSet.has(path)) collapsedSet.delete(path);
+          else collapsedSet.add(path);
+          buildTree();
+          return;
+        }
+        selectedFolder = path === '' ? null : path;
+        clearSelection();
+        buildTree();
+        render();
+      });
+    });
+  }
+
+  function renderNodes(children) {
+    const names = Object.keys(children).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    let html = '';
+    names.forEach(n => {
+      const node = children[n];
+      const hasKids = Object.keys(node.children).length > 0;
+      const isCollapsed = collapsedSet.has(node.full);
+      const isActive = selectedFolder === node.full;
+      html += '<div class="tnode-row' + (isActive ? ' active' : '') + '" data-path="' + escapeAttr(node.full) + '">' +
+              '<span class="caret">' + (hasKids ? (isCollapsed ? '▶' : '▼') : '') + '</span>' +
+              '<span class="fname">📁 ' + escapeHtml(n) + '</span>' +
+              '<span class="count">' + node.count + '</span></div>';
+      if (hasKids) {
+        html += '<div class="tchildren' + (isCollapsed ? ' collapsed' : '') + '">' +
+                renderNodes(node.children) + '</div>';
+      }
+    });
+    return html;
+  }
+
+  // ================= RENDER TABEL =================
+  function render() {
+    const q = filterInput.value.trim().toLowerCase();
+
+    viewRows = allRows.filter(r => {
+      if (selectedFolder !== null &&
+          r.path !== selectedFolder &&
+          !r.path.startsWith(selectedFolder + '\\')) return false;
+      if (q && !r.name.toLowerCase().includes(q) &&
+              !r.path.toLowerCase().includes(q) &&
+              !r.ext.toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+    if (sortKey) {
+      viewRows.sort((a, b) => {
+        const cmp = a[sortKey].localeCompare(b[sortKey], undefined, { numeric: true, sensitivity: 'base' });
+        return sortAsc ? cmp : -cmp;
+      });
+    }
+
+    document.querySelectorAll('thead th[data-key]').forEach(th => {
+      const arrow = th.querySelector('.arrow');
+      if (arrow) arrow.textContent = (th.dataset.key === sortKey) ? (sortAsc ? '▲' : '▼') : '';
+    });
+
+    if (viewRows.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="4" class="empty">Tidak ada file yang cocok.</td></tr>';
+    } else {
+      tableBody.innerHTML = viewRows.map((r, i) =>
+        '<tr>' +
+        '<td class="num">' + (i + 1) + '</td>' +
+        '<td class="selectable" data-r="' + i + '" data-c="0">' + escapeHtml(r.name) + '</td>' +
+        '<td class="selectable" data-r="' + i + '" data-c="1">' + escapeHtml(r.path) + '</td>' +
+        '<td class="selectable" data-r="' + i + '" data-c="2"><span class="ext-badge" style="' +
+            extStyle(r.ext) + '">' + escapeHtml(r.ext) + '</span></td>' +
+        '</tr>'
+      ).join('');
+    }
+
+    let s = 'Menampilkan ' + viewRows.length + ' dari ' + allRows.length + ' file';
+    if (hiddenCount > 0) s += ' • ' + hiddenCount + ' file bantuan disembunyikan';
+    stats.textContent = s;
+  }
+
+  function extStyle(ext) {
+    let h = 0;
+    for (let i = 0; i < ext.length; i++) h = (h * 31 + ext.charCodeAt(i)) % 360;
+    return 'background:hsl(' + h + ',70%,93%);color:hsl(' + h + ',60%,32%);';
+  }
+
+  // ================= SELEKSI SEL (drag, shift+klik, copy) =================
+  tableBody.addEventListener('mousedown', (e) => {
+    const td = e.target.closest('td.selectable');
+    if (!td) return;
+    e.preventDefault();
+    // seleksi di tabel register dibatalkan agar tidak dua-duanya aktif
+    if (window.__spClearSel) window.__spClearSel();
+    // Shift+klik: perluas seleksi dari sel pertama (anchor) sampai sel ini,
+    // seperti di Excel — bisa lompat jauh ke bawah tanpa drag
+    if (e.shiftKey && selAnchor) {
+      selFocus = { r: +td.dataset.r, c: +td.dataset.c };
+      paintSelection();
+      return;
+    }
+    dragging = true;
+    selAnchor = { r: +td.dataset.r, c: +td.dataset.c };
+    selFocus = { ...selAnchor };
+    paintSelection();
+  });
+
+  tableBody.addEventListener('mouseover', (e) => {
+    if (!dragging) return;
+    const td = e.target.closest('td.selectable');
+    if (!td) return;
+    selFocus = { r: +td.dataset.r, c: +td.dataset.c };
+    paintSelection();
+  });
+
+  document.addEventListener('mouseup', () => { dragging = false; });
+
+  function selectionRect() {
+    if (!selAnchor || !selFocus) return null;
+    return {
+      r1: Math.min(selAnchor.r, selFocus.r), r2: Math.max(selAnchor.r, selFocus.r),
+      c1: Math.min(selAnchor.c, selFocus.c), c2: Math.max(selAnchor.c, selFocus.c)
+    };
+  }
+
+  function paintSelection() {
+    const rect = selectionRect();
+    tableBody.querySelectorAll('td.selectable').forEach(td => {
+      const r = +td.dataset.r, c = +td.dataset.c;
+      const inSel = rect && r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2;
+      td.classList.toggle('sel', !!inSel);
+    });
+    const n = rect ? (rect.r2 - rect.r1 + 1) * (rect.c2 - rect.c1 + 1) : 0;
+    btnCopy.disabled = n === 0;
+    btnCopy.textContent = n > 1 ? ('📋 Copy (' + n + ' sel)') : '📋 Copy';
+  }
+
+  function clearSelection() {
+    selAnchor = selFocus = null;
+    dragging = false;
+    if (tableBody.querySelector('.sel')) paintSelection();
+    btnCopy.disabled = true;
+    btnCopy.textContent = '📋 Copy';
+  }
+
+  function copySelection() {
+    const rect = selectionRect();
+    if (!rect) return;
+    const lines = [];
+    for (let r = rect.r1; r <= rect.r2; r++) {
+      const cells = [];
+      for (let c = rect.c1; c <= rect.c2; c++) cells.push(viewRows[r][COLS[c]]);
+      lines.push(cells.join('\t'));
+    }
+    const text = lines.join('\n');
+    const ok   = () => showToast('✅ ' + lines.length + ' baris tersalin — tinggal paste (Ctrl+V) di Excel');
+    const fail = () => showToast('⚠️ Gagal menyalin ke clipboard — coba klik halaman dulu lalu ulangi');
+
+    // metode klasik: berfungsi juga saat dibuka via file:// tanpa izin clipboard
+    const legacyCopy = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      let done = false;
+      try { done = document.execCommand('copy'); } catch (err) { done = false; }
+      ta.remove();
+      if (done) ok(); else fail();
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok).catch(legacyCopy);
+    } else {
+      legacyCopy();
+    }
+  }
+
+  btnCopy.addEventListener('click', copySelection);
+
+  // hooks agar section register (script di bawah) bisa berbagi toast &
+  // saling membatalkan seleksi sel dengan tabel utama
+  window.__mainClearSel = clearSelection;
+  window.__toast = showToast;
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' &&
+        document.activeElement.tagName !== 'INPUT' && selectionRect()) {
+      e.preventDefault();
+      copySelection();
+    }
+    if (e.key === 'Escape') clearSelection();
+  });
+
+  // ================= EXPORT CSV =================
+  btnExport.addEventListener('click', () => {
+    const header = 'File Name,Folder Path,Extension\n';
+    const body = viewRows.map(r =>
+      [r.name, r.path, r.ext].map(v => '"' + v.replace(/"/g, '""') + '"').join(',')
+    ).join('\n');
+    const blob = new Blob(['﻿' + header + body], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'file-audit-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  // ================= UTIL =================
+  let toastTimer = null;
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 4200);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, '&quot;');
+  }
+})();
+</script>
+
+<script>
+/* ================= SECTION: TARIK REGISTER EXCEL SHAREPOINT ================= */
+(function () {
+  const XLSX_CDN = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+
+  let workbook = null;
+  let headers = [];      // judul kolom dari baris pertama sheet
+  let allRows = [];      // seluruh baris data (array of array string)
+  let viewRows = [];     // hasil filter + sort
+  let sortCol = null, sortAsc = true;
+  let companyCol = -1;   // indeks kolom "Company" di sheet aktif (-1 = tidak ada)
+  let anchor = null, focusCell = null, dragging = false;
+
+  const btnLocal   = document.getElementById('btnSpLocal');
+  const spFileName = document.getElementById('spFileName');
+  const companySel = document.getElementById('spCompanySel');
+  const fileInput = document.getElementById('spFileInput');
+  const sheetSel  = document.getElementById('spSheetSel');
+  const spFilter  = document.getElementById('spFilter');
+  const btnClear  = document.getElementById('btnSpClear');
+  const btnCopy   = document.getElementById('btnSpCopy');
+  const spHead    = document.getElementById('spHead');
+  const spBody    = document.getElementById('spBody');
+  const spStats   = document.getElementById('spStats');
+
+  const toastFn = (m) => (window.__toast ? window.__toast(m) : alert(m));
+
+  // muat library SheetJS dari CDN saat pertama kali dibutuhkan
+  function loadXLSX() {
+    return new Promise((resolve, reject) => {
+      if (window.XLSX) return resolve();
+      const s = document.createElement('script');
+      s.src = XLSX_CDN;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Gagal memuat library Excel — butuh koneksi internet saat pertama kali'));
+      document.head.appendChild(s);
+    });
+  }
+
+  // ---------- Pilih file Excel lokal / OneDrive sync ----------
+  btnLocal.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    spStats.textContent = '⏳ Membaca ' + f.name + '...';
+    try {
+      await loadXLSX();
+      const buf = await f.arrayBuffer();
+      openWorkbook(buf, f.name);
+      spFileName.textContent = '📄 ' + f.name;
+    } catch (err) {
+      spStats.textContent = '';
+      toastFn('⚠️ Gagal membaca file: ' + err.message);
+    }
+    fileInput.value = '';
+  });
+
+  // ---------- Buka workbook & pilih sheet ----------
+  function openWorkbook(buf, sourceName) {
+    workbook = XLSX.read(new Uint8Array(buf), { type: 'array' });
+    if (!workbook.SheetNames.length) { toastFn('⚠️ File Excel tidak punya sheet.'); return; }
+
+    sheetSel.innerHTML = workbook.SheetNames.map((n, i) =>
+      '<option value="' + i + '">📑 ' + escapeHtml(n) + '</option>').join('');
+    sheetSel.disabled = false;
+
+    renderSheet(0);
+    toastFn('✅ Register dimuat dari ' + sourceName + ' (' + workbook.SheetNames.length + ' sheet)');
+  }
+
+  sheetSel.addEventListener('change', () => renderSheet(+sheetSel.value));
+
+  function renderSheet(idx) {
+    const ws = workbook.Sheets[workbook.SheetNames[idx]];
+    // raw:false = pakai teks terformat sesuai tampilan Excel (tanggal, angka, dll.)
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    const rows = aoa.filter(r => r.some(v => String(v).trim() !== ''));
+
+    if (rows.length === 0) {
+      spHead.innerHTML = '';
+      spBody.innerHTML = '<tr><td class="empty" colspan="99">Sheet ini kosong.</td></tr>';
+      spStats.textContent = '';
+      return;
+    }
+
+    // baris pertama = judul kolom; samakan jumlah kolom di semua baris
+    const ncol = Math.max(...rows.map(r => r.length));
+    headers = [];
+    for (let i = 0; i < ncol; i++) {
+      const h = String(rows[0][i] || '').trim();
+      headers.push(h || 'Kolom ' + (i + 1));
+    }
+    allRows = rows.slice(1).map(r => {
+      const out = [];
+      for (let i = 0; i < ncol; i++) out.push(String(r[i] == null ? '' : r[i]));
+      return out;
+    });
+
+    // deteksi kolom "Company" lalu isi dropdown dengan nilai uniknya
+    companyCol = headers.findIndex(h => h.toLowerCase().includes('company'));
+    if (companyCol >= 0) {
+      const values = [...new Set(
+        allRows.map(r => r[companyCol].trim()).filter(v => v !== '')
+      )].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      companySel.innerHTML = '<option value="">🏢 Semua Company</option>' +
+        values.map(v => '<option value="' + escapeAttr(v) + '">' + escapeHtml(v) + '</option>').join('');
+      companySel.disabled = false;
+    } else {
+      companySel.innerHTML = '<option value="">Kolom "Company" tidak ditemukan di sheet ini</option>';
+      companySel.disabled = true;
+    }
+
+    sortCol = null;
+    spFilter.value = '';
+    spFilter.disabled = false;
+    btnClear.disabled = false;
+    clearSel();
+    renderTable();
+  }
+
+  companySel.addEventListener('change', () => { clearSel(); renderTable(); });
+
+  // ---------- Render tabel register ----------
+  function renderTable() {
+    const q = spFilter.value.trim().toLowerCase();
+    const company = companySel.disabled ? '' : companySel.value;
+
+    viewRows = allRows.filter(r => {
+      if (company && r[companyCol].trim() !== company) return false;
+      if (q && !r.some(v => v.toLowerCase().includes(q))) return false;
+      return true;
+    });
+
+    if (sortCol !== null) {
+      viewRows = viewRows.slice().sort((a, b) => {
+        const cmp = a[sortCol].localeCompare(b[sortCol], undefined, { numeric: true, sensitivity: 'base' });
+        return sortAsc ? cmp : -cmp;
+      });
+    }
+
+    spHead.innerHTML = '<tr><th class="num">No</th>' + headers.map((h, i) =>
+      '<th data-col="' + i + '">' + escapeHtml(h) +
+      ' <span class="arrow">' + (sortCol === i ? (sortAsc ? '▲' : '▼') : '') + '</span></th>'
+    ).join('') + '</tr>';
+
+    spHead.querySelectorAll('th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = +th.dataset.col;
+        if (sortCol === col) { sortAsc = !sortAsc; }
+        else { sortCol = col; sortAsc = true; }
+        clearSel();
+        renderTable();
+      });
+    });
+
+    if (viewRows.length === 0) {
+      spBody.innerHTML = '<tr><td class="empty" colspan="99">Tidak ada baris yang cocok.</td></tr>';
+    } else {
+      spBody.innerHTML = viewRows.map((r, ri) =>
+        '<tr><td class="num">' + (ri + 1) + '</td>' +
+        r.map((v, ci) =>
+          '<td class="selectable" data-r="' + ri + '" data-c="' + ci + '">' + escapeHtml(v) + '</td>'
+        ).join('') + '</tr>'
+      ).join('');
+    }
+
+    spStats.textContent = 'Menampilkan ' + viewRows.length + ' dari ' + allRows.length +
+                          ' baris • ' + headers.length + ' kolom';
+  }
+
+  // ---------- Clear filter ----------
+  spFilter.addEventListener('input', () => { clearSel(); renderTable(); });
+  btnClear.addEventListener('click', () => {
+    spFilter.value = '';
+    if (!companySel.disabled) companySel.value = '';
+    clearSel();
+    renderTable();
+  });
+
+  // ---------- Seleksi sel (klik, drag, shift+klik) ----------
+  spBody.addEventListener('mousedown', (e) => {
+    const td = e.target.closest('td.selectable');
+    if (!td) return;
+    e.preventDefault();
+    if (window.__mainClearSel) window.__mainClearSel(); // batalkan seleksi tabel utama
+    if (e.shiftKey && anchor) {
+      focusCell = { r: +td.dataset.r, c: +td.dataset.c };
+      paintSel();
+      return;
+    }
+    dragging = true;
+    anchor = { r: +td.dataset.r, c: +td.dataset.c };
+    focusCell = { ...anchor };
+    paintSel();
+  });
+
+  spBody.addEventListener('mouseover', (e) => {
+    if (!dragging) return;
+    const td = e.target.closest('td.selectable');
+    if (!td) return;
+    focusCell = { r: +td.dataset.r, c: +td.dataset.c };
+    paintSel();
+  });
+
+  document.addEventListener('mouseup', () => { dragging = false; });
+
+  function selRect() {
+    if (!anchor || !focusCell) return null;
+    return {
+      r1: Math.min(anchor.r, focusCell.r), r2: Math.max(anchor.r, focusCell.r),
+      c1: Math.min(anchor.c, focusCell.c), c2: Math.max(anchor.c, focusCell.c)
+    };
+  }
+
+  function paintSel() {
+    const rect = selRect();
+    spBody.querySelectorAll('td.selectable').forEach(td => {
+      const r = +td.dataset.r, c = +td.dataset.c;
+      const inSel = rect && r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2;
+      td.classList.toggle('sel', !!inSel);
+    });
+    const n = rect ? (rect.r2 - rect.r1 + 1) * (rect.c2 - rect.c1 + 1) : 0;
+    btnCopy.disabled = n === 0;
+    btnCopy.textContent = n > 1 ? ('📋 Copy (' + n + ' sel)') : '📋 Copy';
+  }
+
+  function clearSel() {
+    anchor = focusCell = null;
+    dragging = false;
+    spBody.querySelectorAll('td.sel').forEach(td => td.classList.remove('sel'));
+    btnCopy.disabled = true;
+    btnCopy.textContent = '📋 Copy';
+  }
+  window.__spClearSel = clearSel; // dipanggil tabel utama saat mulai seleksi di sana
+
+  // ---------- Copy ke clipboard (format tab utk Excel) ----------
+  function copySel() {
+    const rect = selRect();
+    if (!rect) return;
+    const lines = [];
+    for (let r = rect.r1; r <= rect.r2; r++) {
+      const cells = [];
+      for (let c = rect.c1; c <= rect.c2; c++) cells.push(viewRows[r][c]);
+      lines.push(cells.join('\t'));
+    }
+    const text = lines.join('\n');
+    const ok   = () => toastFn('✅ ' + lines.length + ' baris register tersalin — paste (Ctrl+V) di Excel');
+    const fail = () => toastFn('⚠️ Gagal menyalin ke clipboard — coba klik halaman dulu lalu ulangi');
+
+    const legacyCopy = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      let done = false;
+      try { done = document.execCommand('copy'); } catch (err) { done = false; }
+      ta.remove();
+      if (done) ok(); else fail();
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok).catch(legacyCopy);
+    } else {
+      legacyCopy();
+    }
+  }
+
+  btnCopy.addEventListener('click', copySel);
+
+  document.addEventListener('keydown', (e) => {
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' &&
+        tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA' && selRect()) {
+      e.preventDefault();
+      copySel();
+    }
+    if (e.key === 'Escape') clearSel();
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, '&quot;');
+  }
+})();
+</script>
+</body>
+</html>
